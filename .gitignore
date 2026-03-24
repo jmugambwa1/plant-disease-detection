@@ -1,0 +1,14 @@
+venv/
+__pycache__/
+*.pyc
+
+# ML artifacts and datasets
+dataset/
+myModel.h5
+best_model.h5
+class_indices.json
+myModel_training_curves.png
+
+# OS/editor noise
+.DS_Store
+Thumbs.db

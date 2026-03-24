@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>LeafGuard — Plant Disease Detection System</title>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,600;1,400&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #0d1f14; --surface: #132019; --surface2: #1a2e20;
+      --border: rgba(255,255,255,0.07); --border2: rgba(255,255,255,0.13);
+      --green: #4ade80; --green-dim: #22c55e;
+      --text: #f0fdf4; --muted: #86efac; --subtle: rgba(240,253,244,0.45);
+      --amber: #fbbf24; --red: #f87171;
+    }
+    html { scroll-behavior: smooth; }
+    body { font-family: 'Outfit', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; line-height: 1.6; }
+
+    nav {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 1.25rem 2.5rem; border-bottom: 1px solid var(--border);
+      position: sticky; top: 0; z-index: 100;
+      background: rgba(13,31,20,0.92); backdrop-filter: blur(16px);
+    }
+    .nav-logo { display: flex; align-items: center; gap: 10px; font-family: 'Playfair Display', serif; font-size: 1.35rem; color: var(--text); text-decoration: none; }
+    .nav-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--green); animation: pulse 2s ease infinite; }
+    @keyframes pulse { 0%,100%{box-shadow:0 0 0 0 rgba(74,222,128,0.4)}50%{box-shadow:0 0 0 6px rgba(74,222,128,0)} }
+    .nav-chip { font-size: 0.7rem; font-weight: 500; letter-spacing: 0.1em; text-transform: uppercase; padding: 0.3rem 0.9rem; border: 1px solid var(--border2); border-radius: 999px; color: var(--muted); }
+
+    .hero { text-align: center; padding: 5rem 2rem 3rem; max-width: 700px; margin: 0 auto; animation: rise 0.6s ease both; }
+    @keyframes rise { from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)} }
+    .hero-tag { display: inline-flex; align-items: center; gap: 6px; font-size: 0.72rem; font-weight: 500; letter-spacing: 0.12em; text-transform: uppercase; color: var(--green); border: 1px solid rgba(74,222,128,0.25); background: rgba(74,222,128,0.08); padding: 0.35rem 1rem; border-radius: 999px; margin-bottom: 1.5rem; }
+    .hero-tag::before { content:''; width:6px; height:6px; border-radius:50%; background:var(--green); }
+    .hero h1 { font-family: 'Playfair Display', serif; font-size: clamp(2.4rem,5.5vw,4rem); font-weight: 600; line-height: 1.1; letter-spacing: -0.02em; margin-bottom: 1.2rem; }
+    .hero h1 em { font-style: italic; font-weight: 400; color: var(--green); }
+    .hero p { font-size: 1rem; font-weight: 300; color: var(--subtle); max-width: 460px; margin: 0 auto 2.5rem; line-height: 1.8; }
+
+    .stats { display: flex; justify-content: center; gap: 3rem; flex-wrap: wrap; margin-bottom: 3.5rem; }
+    .stat { text-align: center; }
+    .stat-num { font-family: 'Playfair Display', serif; font-size: 1.8rem; color: var(--green); }
+    .stat-lbl { font-size: 0.7rem; font-weight: 400; color: var(--subtle); text-transform: uppercase; letter-spacing: 0.08em; }
+
+    .upload-section { max-width: 680px; margin: 0 auto; padding: 0 1.5rem 5rem; animation: rise 0.6s 0.12s ease both; }
+    .upload-box { background: var(--surface); border: 1px solid var(--border2); border-radius: 20px; overflow: hidden; }
+
+    .drop-zone { padding: 3rem 2rem; text-align: center; cursor: pointer; position: relative; transition: background 0.2s; border-bottom: 1px solid var(--border); }
+    .drop-zone:hover, .drop-zone.on { background: rgba(74,222,128,0.04); }
+    .drop-zone input[type=file] { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+    .drop-icon { width: 64px; height: 64px; border-radius: 16px; border: 1px solid var(--border2); background: var(--surface2); display: flex; align-items: center; justify-content: center; margin: 0 auto 1.2rem; font-size: 1.6rem; transition: border-color 0.2s, transform 0.2s; }
+    .drop-zone:hover .drop-icon { border-color: rgba(74,222,128,0.4); transform: scale(1.04); }
+    .drop-title { font-size: 1rem; font-weight: 500; color: var(--text); margin-bottom: 0.4rem; }
+    .drop-sub { font-size: 0.78rem; font-weight: 300; color: var(--subtle); }
+
+    #previewArea { display: none; }
+    #previewImg { width: 100%; height: 280px; object-fit: cover; display: block; }
+    .preview-bar { display: flex; align-items: center; justify-content: space-between; padding: 0.75rem 1.25rem; background: var(--surface2); border-bottom: 1px solid var(--border); }
+    .preview-name { font-size: 0.78rem; color: var(--muted); max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .btn-clear { background: transparent; border: 1px solid var(--border2); color: var(--subtle); border-radius: 6px; padding: 0.3rem 0.75rem; font-size: 0.72rem; font-family: 'Outfit',sans-serif; cursor: pointer; transition: all 0.15s; }
+    .btn-clear:hover { border-color: var(--red); color: var(--red); }
+
+    .error-box { display: none; margin: 0 1.5rem 1rem; padding: 0.9rem 1.1rem; background: rgba(248,113,113,0.08); border: 1px solid rgba(248,113,113,0.25); border-radius: 10px; font-size: 0.82rem; color: var(--red); line-height: 1.6; }
+
+    .btn-wrap { padding: 1.2rem 1.5rem; }
+    .btn-analyze { width: 100%; padding: 0.95rem 1.5rem; background: var(--green); color: #0d1f14; border: none; border-radius: 12px; font-family: 'Outfit',sans-serif; font-size: 0.95rem; font-weight: 600; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; justify-content: center; gap: 8px; }
+    .btn-analyze:hover:not(:disabled) { background: #86efac; transform: translateY(-1px); }
+    .btn-analyze:disabled { background: var(--surface2); color: var(--subtle); cursor: not-allowed; }
+    .spinner { width: 16px; height: 16px; border: 2px solid rgba(13,31,20,0.3); border-top-color: #0d1f14; border-radius: 50%; animation: spin 0.65s linear infinite; display: none; }
+    @keyframes spin { to{transform:rotate(360deg)} }
+
+    #results { display: none; max-width: 680px; margin: 0 auto; padding: 0 1.5rem 5rem; animation: rise 0.5s ease both; }
+    .results-title-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.5rem; }
+    .results-title { font-family: 'Playfair Display', serif; font-size: 1.4rem; }
+    .time-badge { font-size: 0.7rem; padding: 0.3rem 0.8rem; background: rgba(74,222,128,0.1); border: 1px solid rgba(74,222,128,0.2); color: var(--green); border-radius: 999px; }
+
+    .pred-card { background: var(--surface); border: 1px solid var(--border2); border-radius: 16px; overflow: hidden; margin-bottom: 1rem; transition: border-color 0.2s; }
+    .pred-card:hover { border-color: rgba(74,222,128,0.3); }
+    .pred-card.top { border-color: rgba(74,222,128,0.45); }
+
+    .card-header { display: flex; align-items: center; gap: 1rem; padding: 1.2rem 1.4rem; border-bottom: 1px solid var(--border); }
+    .rank-num { font-family: 'Playfair Display', serif; font-size: 1.5rem; color: var(--border2); min-width: 28px; }
+    .top .rank-num { color: var(--green); }
+    .card-title { flex: 1; }
+    .disease-label { font-size: 1rem; font-weight: 500; color: var(--text); margin-bottom: 2px; }
+    .disease-class { font-size: 0.7rem; font-weight: 300; color: var(--subtle); font-family: monospace; }
+    .conf-pill { font-size: 0.78rem; font-weight: 600; padding: 0.3rem 0.85rem; border-radius: 999px; background: rgba(74,222,128,0.12); color: var(--green); border: 1px solid rgba(74,222,128,0.2); }
+    .conf-pill.low { background: rgba(240,253,244,0.05); color: var(--subtle); border-color: var(--border); }
+
+    .conf-bar-wrap { padding: 0.6rem 1.4rem 0; }
+    .conf-bar-bg { height: 4px; background: var(--surface2); border-radius: 999px; overflow: hidden; }
+    .conf-bar-fill { height: 100%; border-radius: 999px; background: var(--green); width: 0%; transition: width 1s cubic-bezier(0.16,1,0.3,1); }
+    .pred-card:not(.top) .conf-bar-fill { background: rgba(74,222,128,0.35); }
+
+    .card-body { padding: 1.2rem 1.4rem; display: grid; gap: 0.75rem; }
+    .info-row { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
+    .info-block { background: var(--surface2); border-radius: 10px; padding: 0.9rem 1rem; }
+    .info-block.full { grid-column: 1/-1; }
+    .info-lbl { font-size: 0.65rem; font-weight: 500; text-transform: uppercase; letter-spacing: 0.12em; color: var(--green-dim); margin-bottom: 0.5rem; }
+    .info-txt { font-size: 0.83rem; font-weight: 300; color: var(--muted); line-height: 1.75; }
+
+    footer { border-top: 1px solid var(--border); padding: 1.5rem 2.5rem; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1rem; }
+    .footer-txt { font-size: 0.72rem; font-weight: 300; color: var(--subtle); }
+    .footer-pills { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+    .footer-pill { font-size: 0.65rem; padding: 0.2rem 0.7rem; border: 1px solid var(--border2); border-radius: 999px; color: var(--subtle); }
+
+    @media(max-width:560px){
+      nav{padding:1rem 1.2rem}
+      .hero{padding:3rem 1.2rem 2.5rem}
+      .info-row{grid-template-columns:1fr}
+      .stats{gap:1.5rem}
+    }
+  </style>
+</head>
+<body>
+
+<nav>
+  <a class="nav-logo" href="#">
+    <div class="nav-dot"></div>
+    LeafGuard
+  </a>
+  <span class="nav-chip">MobileNetV2 · 38 classes</span>
+</nav>
+
+<div class="hero">
+  <div class="hero-tag">Deep Learning Diagnosis</div>
+  <h1>Identify plant diseases<br/><em>instantly</em></h1>
+  <p>Upload a leaf photo and receive an instant diagnosis complete with disease description, prevention strategies, and treatment recommendations.</p>
+</div>
+
+<div class="stats">
+  <div class="stat"><div class="stat-num">96.6%</div><div class="stat-lbl">Val Accuracy</div></div>
+  <div class="stat"><div class="stat-num">38</div><div class="stat-lbl">Disease Classes</div></div>
+  <div class="stat"><div class="stat-num">54k+</div><div class="stat-lbl">Training Images</div></div>
+</div>
+
+<div class="upload-section">
+  <div class="upload-box">
+    <div class="drop-zone" id="dropZone">
+      <input type="file" id="fileInput" accept="image/jpeg,image/png,image/webp"/>
+      <div class="drop-icon">🌿</div>
+      <p class="drop-title">Drop a leaf image here</p>
+      <p class="drop-sub">or click to browse · JPEG, PNG, WebP · max 10 MB</p>
+    </div>
+    <div id="previewArea">
+      <img id="previewImg" src="" alt="Preview"/>
+      <div class="preview-bar">
+        <span class="preview-name" id="previewName"></span>
+        <button class="btn-clear" onclick="clearImage()">Remove</button>
+      </div>
+    </div>
+    <div class="error-box" id="errorBox"></div>
+    <div class="btn-wrap">
+      <button class="btn-analyze" id="analyzeBtn" onclick="analyze()" disabled>
+        <div class="spinner" id="spinner"></div>
+        <span id="btnText">Analyze Leaf</span>
+      </button>
+    </div>
+  </div>
+</div>
+
+<div id="results">
+  <div class="results-title-row">
+    <h2 class="results-title">Diagnosis</h2>
+    <span class="time-badge" id="timeBadge"></span>
+  </div>
+  <div id="cardsContainer"></div>
+</div>
+
+<footer>
+  <span class="footer-txt">LeafGuard · Plant Disease Detection System</span>
+  <div class="footer-pills">
+    <span class="footer-pill">MobileNetV2</span>
+    <span class="footer-pill">PlantVillage</span>
+    <span class="footer-pill">FastAPI</span>
+    <span class="footer-pill">TensorFlow 2.15</span>
+  </div>
+</footer>
+
+<script>
+  const API = 'http://localhost:8000';
+  let file = null;
+  const fileInput = document.getElementById('fileInput');
+  const dropZone = document.getElementById('dropZone');
+  const previewArea = document.getElementById('previewArea');
+  const previewImg = document.getElementById('previewImg');
+  const previewName = document.getElementById('previewName');
+  const analyzeBtn = document.getElementById('analyzeBtn');
+  const errorBox = document.getElementById('errorBox');
+
+  fileInput.addEventListener('change', e => { if (e.target.files[0]) setFile(e.target.files[0]); });
+  dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('on'); });
+  dropZone.addEventListener('dragleave', () => dropZone.classList.remove('on'));
+  dropZone.addEventListener('drop', e => {
+    e.preventDefault(); dropZone.classList.remove('on');
+    if (e.dataTransfer.files[0]) setFile(e.dataTransfer.files[0]);
+  });
+
+  function setFile(f) {
+    file = f;
+    const r = new FileReader();
+    r.onload = ev => {
+      previewImg.src = ev.target.result;
+      previewArea.style.display = 'block';
+      previewName.textContent = f.name;
+      analyzeBtn.disabled = false;
+      errorBox.style.display = 'none';
+      document.getElementById('results').style.display = 'none';
+    };
+    r.readAsDataURL(f);
+  }
+
+  function clearImage() {
+    file = null; fileInput.value = '';
+    previewArea.style.display = 'none';
+    analyzeBtn.disabled = true;
+    errorBox.style.display = 'none';
+    document.getElementById('results').style.display = 'none';
+  }
+
+  async function analyze() {
+    if (!file) return;
+    analyzeBtn.disabled = true;
+    document.getElementById('spinner').style.display = 'block';
+    document.getElementById('btnText').textContent = 'Analyzing…';
+    errorBox.style.display = 'none';
+    document.getElementById('results').style.display = 'none';
+    try {
+      const fd = new FormData();
+      fd.append('file', file);
+      const res = await fetch(`${API}/predict`, { method: 'POST', body: fd });
+      if (!res.ok) throw new Error(`Status ${res.status}`);
+      renderResults(await res.json());
+    } catch(err) {
+      errorBox.textContent = `Could not reach the API at ${API}. Make sure the server is running, then try again. (${err.message})`;
+      errorBox.style.display = 'block';
+    } finally {
+      analyzeBtn.disabled = false;
+      document.getElementById('spinner').style.display = 'none';
+      document.getElementById('btnText').textContent = 'Analyze Leaf';
+    }
+  }
+
+  function renderResults(data) {
+    document.getElementById('timeBadge').textContent = '⚡ ' + data.inference_time;
+    const container = document.getElementById('cardsContainer');
+    container.innerHTML = '';
+    data.top_predictions.forEach(p => {
+      const isTop = p.rank === 1;
+      const pct = (p.confidence * 100).toFixed(1);
+      const label = p.label.replace(/___/g,' — ').replace(/_/g,' ');
+      const card = document.createElement('div');
+      card.className = 'pred-card' + (isTop ? ' top' : '');
+      card.innerHTML = `
+        <div class="card-header">
+          <div class="rank-num">${p.rank}</div>
+          <div class="card-title">
+            <div class="disease-label">${label}</div>
+            <div class="disease-class">${p.class_name}</div>
+          </div>
+          <div class="conf-pill${parseFloat(pct)<10?' low':''}">${p.confidence_pct}</div>
+        </div>
+        <div class="conf-bar-wrap"><div class="conf-bar-bg"><div class="conf-bar-fill" data-w="${pct}"></div></div></div>
+        <div class="card-body">
+          <div class="info-block full"><div class="info-lbl">Description</div><div class="info-txt">${p.description}</div></div>
+          <div class="info-row">
+            <div class="info-block"><div class="info-lbl">Prevention</div><div class="info-txt">${p.prevention}</div></div>
+            <div class="info-block"><div class="info-lbl">Treatment</div><div class="info-txt">${p.treatment}</div></div>
+          </div>
+        </div>`;
+      container.appendChild(card);
+    });
+    const el = document.getElementById('results');
+    el.style.display = 'block';
+    requestAnimationFrame(() => {
+      document.querySelectorAll('.conf-bar-fill').forEach(b => b.style.width = b.dataset.w + '%');
+    });
+    el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+</script>
+</body>
+</html>

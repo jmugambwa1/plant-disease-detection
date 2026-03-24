@@ -1,0 +1,142 @@
+# 🌿 Plant Disease Detection API — Cursor Rules
+# -----------------------------------------------
+# Stack: FastAPI + TensorFlow/Keras (MobileNetV2) + Pandas + Flutter (Phase 3)
+# Purpose: AI-powered plant disease detection from leaf images
+
+## Project Overview
+This is a plant disease detection system with three components:
+1. `train.py` — Fine-tune MobileNetV2 on PlantVillage dataset → outputs myModel.h5
+2. `predict.py` — Image preprocessing + model inference + CSV disease lookup
+3. `main.py` — FastAPI backend exposing /predict, /classes, / endpoints
+
+## Architecture Rules
+
+### File responsibilities — never mix these
+- `train.py` → ONLY training logic, no FastAPI imports
+- `predict.py` → ONLY inference logic, no FastAPI imports, no training logic
+- `main.py` → ONLY FastAPI routing and middleware, import from predict.py
+
+### Model
+- Architecture: MobileNetV2 pretrained on ImageNet, fine-tuned on PlantVillage
+- Input: 224×224 RGB float32, normalized to [0.0, 1.0]
+- Output: softmax probabilities over N classes (38 for full PlantVillage)
+- Saved as: myModel.h5 (Keras HDF5 format)
+- Class map: class_indices.json → {int_index: "ClassName"}
+
+### Dataset
+- Source: PlantVillage (38 classes, ~54,000 images)
+- Folder structure: dataset/train/<ClassName>/ and dataset/val/<ClassName>/
+- Class names use triple underscore convention: "Tomato___Late_blight"
+
+### CSV (p4.csv)
+- Required columns (after normalisation to lowercase + underscores):
+  label, description, prevention, treatment, example_picture
+- label values should loosely match PlantVillage class folder names
+- Lookup uses exact match first, then fuzzy partial match
+
+## Coding Conventions
+
+### Python style
+- Python 3.10+
+- Type hints on all function signatures
+- Docstrings on every function (one-line summary + param/return description)
+- Constants in UPPER_SNAKE_CASE at top of file
+- No inline magic numbers — always assign to a named constant
+
+### FastAPI specifics
+- Use lifespan context manager (not @app.on_event) for startup/shutdown
+- Load model ONCE at startup into module-level globals, never per-request
+- Always validate: file content type, file size (max 10 MB), empty files
+- Return JSONResponse with consistent shape: {status, ...data}
+- Tag all routes for clean Swagger UI grouping
+
+### TensorFlow / Keras specifics
+- Use tf.keras (not standalone keras) for compatibility
+- model.predict() with verbose=0 to suppress progress bars
+- Always np.expand_dims(arr, axis=0) before predict — model expects batch dim
+- Use float32 explicitly, never rely on implicit casting
+- ImageDataGenerator for training augmentation (not tf.data for simplicity)
+
+### Error handling
+- Wrap model.predict() in try/except in predict.py
+- Return HTTP 400 for bad input, 413 for oversized files, 500 for model errors
+- Never expose raw exception tracebacks to the client
+
+### Imports order (PEP8 + project convention)
+1. stdlib
+2. fastapi / uvicorn
+3. tensorflow / numpy / pandas / PIL
+4. local modules (predict, train)
+
+## Response Shape Contract
+All /predict responses must follow this exact shape — Flutter depends on it:
+
+```json
+{
+  "status": "success",
+  "inference_time": "0.045s",
+  "filename": "leaf.jpg",
+  "top_predictions": [
+    {
+      "rank": 1,
+      "class_name": "Tomato___Late_blight",
+      "confidence": 0.9201,
+      "confidence_pct": "92.0%",
+      "label": "Tomato Late Blight",
+      "description": "...",
+      "prevention": "...",
+      "treatment": "...",
+      "example_picture": "..."
+    }
+  ]
+}
+```
+
+DO NOT change this shape without updating Flutter simultaneously.
+
+## File & Folder Structure
+```
+plant-disease-api/
+├── main.py              # FastAPI app
+├── predict.py           # Inference logic
+├── train.py             # Training pipeline
+├── requirements.txt
+├── myModel.h5           # Generated — do not commit to git
+├── class_indices.json   # Generated — do not commit to git
+├── p4.csv               # Disease info database
+├── dataset/             # Training data — do not commit to git
+│   ├── train/
+│   └── val/
+└── .cursorrules         # This file
+```
+
+## .gitignore essentials — always suggest these if git is mentioned
+```
+myModel.h5
+class_indices.json
+dataset/
+__pycache__/
+*.pyc
+.env
+venv/
+```
+
+## Performance Notes
+- MobileNetV2 inference on CPU: ~40–80ms per image (acceptable for mobile)
+- Batch size 32 is optimal for most GPUs; reduce to 16 if OOM errors occur
+- TOP_K = 3 predictions is the default; Flutter displays all 3
+
+## Phase 3 — Flutter Integration (upcoming)
+- Flutter app will POST to /predict as multipart/form-data with field name "file"
+- API base URL will be stored in Flutter as a constant (not hardcoded per-call)
+- Flutter expects top_predictions[0] as primary result, [1] and [2] as alternatives
+- example_picture field may be a URL or local asset path — Flutter handles both
+
+## Common Mistakes to Avoid
+- DO NOT use @app.on_event("startup") — use lifespan instead (deprecated in FastAPI)
+- DO NOT call model.predict() outside a try/except
+- DO NOT return Python exceptions directly — wrap in HTTPException
+- DO NOT resize images with PIL's default NEAREST — always use Image.LANCZOS
+- DO NOT forget to convert PIL image to RGB before prediction (PNG may be RGBA)
+- DO NOT hardcode class names — always read from class_indices.json
+- DO NOT change TOP_K without checking Flutter rendering handles the new count
