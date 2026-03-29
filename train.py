@@ -1,22 +1,3 @@
-"""
-train.py — Fine-tune MobileNetV2 on PlantVillage dataset
----------------------------------------------------------
-Usage:
-    python train.py --data_dir ./dataset --epochs 20 --output myModel.h5
-
-Dataset folder structure expected:
-    dataset/
-        train/
-            Tomato___Bacterial_spot/
-            Tomato___healthy/
-            Potato___Early_blight/
-            ... (38 classes for full PlantVillage)
-        val/
-            ...
-
-If you only have a flat dataset (no train/val split), set --auto_split True
-"""
-
 import os
 import argparse
 import numpy as np
@@ -34,13 +15,11 @@ from tensorflow.keras.callbacks import (
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
 
 
-# ── Constants ──────────────────────────────────────────────────────────────────
 IMG_SIZE   = 224          # MobileNetV2 native size
 BATCH_SIZE = 32
 SEED       = 42
 
 
-# ── CLI args ───────────────────────────────────────────────────────────────────
 def parse_args():
     p = argparse.ArgumentParser(description="Fine-tune MobileNetV2 for plant disease detection")
     p.add_argument("--data_dir",    type=str, default="./dataset",  help="Path to dataset root")
@@ -53,7 +32,6 @@ def parse_args():
     return p.parse_args()
 
 
-# ── Data generators ────────────────────────────────────────────────────────────
 def build_generators(data_dir: str, auto_split: bool, val_split: float):
     train_aug = ImageDataGenerator(
         rescale=1.0 / 255,
@@ -89,7 +67,6 @@ def build_generators(data_dir: str, auto_split: bool, val_split: float):
     return train_gen, val_gen
 
 
-# ── Model ──────────────────────────────────────────────────────────────────────
 def build_model(num_classes: int) -> Model:
     base = MobileNetV2(
         input_shape=(IMG_SIZE, IMG_SIZE, 3),
@@ -111,22 +88,21 @@ def build_model(num_classes: int) -> Model:
     return model, base
 
 
-# ── Training ───────────────────────────────────────────────────────────────────
 def train(args):
-    print("\n📦 Loading dataset …")
+    print("\nLoading dataset...")
     train_gen, val_gen = build_generators(args.data_dir, args.auto_split, args.val_split)
 
     num_classes = train_gen.num_classes
-    print(f"✅ Found {num_classes} classes, {train_gen.samples} training images")
+    print(f"Found {num_classes} classes, {train_gen.samples} training images")
 
     # Save class index mapping (needed by FastAPI predict.py)
     import json
     class_map = {v: k for k, v in train_gen.class_indices.items()}
     with open("class_indices.json", "w") as f:
         json.dump(class_map, f, indent=2)
-    print("✅ class_indices.json saved")
+    print("class_indices.json saved")
 
-    print("\n🧠 Building model …")
+    print("\nBuilding model...")
     model, base = build_model(num_classes)
     model.compile(
         optimizer=Adam(learning_rate=args.lr),
@@ -141,8 +117,7 @@ def train(args):
         ReduceLROnPlateau(factor=0.5, patience=3, min_lr=1e-7, verbose=1),
     ]
 
-    # ── Phase 1: train top layers only ────────────────────────────────────────
-    print("\n🔒 Phase 1 — training top layers (base frozen) …")
+    print("\nPhase 1: training top layers (base frozen)...")
     history1 = model.fit(
         train_gen,
         validation_data=val_gen,
@@ -150,8 +125,7 @@ def train(args):
         callbacks=callbacks,
     )
 
-    # ── Phase 2: fine-tune top 30 layers of base ──────────────────────────────
-    print(f"\n🔓 Phase 2 — fine-tuning top 30 layers for {args.fine_tune} more epochs …")
+    print(f"\nPhase 2: fine-tuning top 30 layers for {args.fine_tune} more epochs...")
     base.trainable = True
     for layer in base.layers[:-30]:
         layer.trainable = False
@@ -169,11 +143,9 @@ def train(args):
         callbacks=callbacks,
     )
 
-    # ── Save final model ───────────────────────────────────────────────────────
     model.save(args.output)
-    print(f"\n✅ Model saved → {args.output}")
+    print(f"\nModel saved to {args.output}")
 
-    # ── Plot training curves ───────────────────────────────────────────────────
     plot_history(history1, history2, args.output)
 
 
@@ -199,7 +171,7 @@ def plot_history(h1, h2, output_name):
 
     plot_path = output_name.replace(".h5", "_training_curves.png")
     plt.savefig(plot_path)
-    print(f"📊 Training curves saved → {plot_path}")
+    print(f"Training curves saved to {plot_path}")
 
 
 if __name__ == "__main__":

@@ -1,18 +1,3 @@
-"""
-main.py — FastAPI Plant Disease Detection API
----------------------------------------------
-Endpoints:
-    GET  /               → health check
-    GET  /classes        → list all detectable diseases
-    POST /predict        → upload leaf image → get prediction
-
-Run locally:
-    uvicorn main:app --host 0.0.0.0 --port 8000 --reload
-
-Run in production:
-    uvicorn main:app --host 0.0.0.0 --port 8000 --workers 2
-"""
-
 from fastapi import FastAPI, File, UploadFile, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, FileResponse
@@ -24,30 +9,27 @@ import time
 from predict import load_artifacts, predict
 
 
-# ── Globals (loaded once at startup) ──────────────────────────────────────────
 MODEL      = None
 CLASS_MAP  = None
 DISEASE_DF = None
 INDEX_PATH = Path(__file__).parent / "index.html"
 
 
-# ── App lifecycle ──────────────────────────────────────────────────────────────
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global MODEL, CLASS_MAP, DISEASE_DF
     MODEL, CLASS_MAP, DISEASE_DF = load_artifacts()
     yield
-    # Cleanup on shutdown (nothing needed)
 
 
 app = FastAPI(
     title=" Plant Disease Detection API",
-    description="Upload a leaf image → get AI-powered disease diagnosis and treatment.",
+    description="Upload a leaf image for disease diagnosis and treatment guidance.",
     version="1.0.0",
     lifespan=lifespan,
 )
 
-# Allow Flutter app (any origin during dev — tighten in production)
+# CORS: allow any origin in dev; tighten for production
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -56,11 +38,8 @@ app.add_middleware(
 )
 
 
-# ── Routes ─────────────────────────────────────────────────────────────────────
-
 @app.get("/", tags=["Frontend"])
 async def root():
-    """Serve the frontend page."""
     if not INDEX_PATH.exists():
         raise HTTPException(status_code=404, detail="index.html not found")
     return FileResponse(INDEX_PATH)
@@ -68,7 +47,6 @@ async def root():
 
 @app.get("/health", tags=["Health"])
 async def health():
-    """Health check endpoint for API monitoring."""
     return {
         "status":  "ok",
         "message": "Plant Disease Detection API is running ",
@@ -78,7 +56,6 @@ async def health():
 
 @app.get("/classes", tags=["Info"])
 async def get_classes():
-    """Return all detectable disease classes."""
     if CLASS_MAP is None:
         raise HTTPException(status_code=503, detail="Model not loaded yet")
     return {
@@ -89,10 +66,6 @@ async def get_classes():
 
 @app.post("/predict", tags=["Prediction"])
 async def predict_disease(file: UploadFile = File(...)):
-    """
-    Upload a plant leaf image (JPEG/PNG/WebP).
-    Returns top-3 predictions with disease info.
-    """
     # Validate file type
     ALLOWED = {"image/jpeg", "image/png", "image/webp", "image/jpg"}
     if file.content_type not in ALLOWED:
@@ -124,6 +97,5 @@ async def predict_disease(file: UploadFile = File(...)):
     })
 
 
-# ── Entry point ────────────────────────────────────────────────────────────────
 if __name__ == "__main__":
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
